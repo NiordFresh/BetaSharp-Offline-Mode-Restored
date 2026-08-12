@@ -1,5 +1,5 @@
 <p align="center">
-<img width="128" height="128" alt="logo-betasharp-omr" src="https://github.com/user-attachments/assets/ea0637e3-7e02-4b1e-8f9f-90b8ba12f949" />
+<img width="128" src="https://github.com/user-attachments/assets/ea0637e3-7e02-4b1e-8f9f-90b8ba12f949" />
 <h1 align="center">BetaSharp: Offline Mode Restored</h1>
 <p align="center">An enhanced version of Minecraft Beta 1.7.3, written in C#.</p>
 </p>
