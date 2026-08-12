@@ -1,21 +1,18 @@
 <p align="center">
 <img height="128" src="BetaSharp.Launcher/logo.png" alt="BetaSharp">
-<h1 align="center">BetaSharp</h1>
+<h1 align="center">BetaSharp: Offline Mode Restored</h1>
 <p align="center">An enhanced version of Minecraft Beta 1.7.3, written in C#.</p>
 </p>
 <p align="center">
-<a href="https://discord.gg/x9AGsjnWv4"><img src="https://img.shields.io/badge/chat%20on-discord-7289DA" alt="Discord"></a>
 <img src="https://img.shields.io/badge/language-C%23-512BD4" alt="C#">
 <img src="https://img.shields.io/badge/framework-.NET-512BD4" alt=".NET">
-<img src="https://img.shields.io/github/issues/Fazin85/betasharp" alt="Issues">
-<img src="https://img.shields.io/github/issues-pr/Fazin85/betasharp" alt="Pull requests">
 </p>
 
 
 # Notice
 
 > [!IMPORTANT]
-> BetaSharp requires a legally purchased copy of Minecraft. We do not support or condone piracy. Please purchase Minecraft at [minecraft.net](https://www.minecraft.net).
+> To use this software, you must own a legally obtained copy of the game. The offline mode provided by the launcher is intended solely for debugging, testing, and software development purposes. It is not intended to bypass licensing or authentication systems, or to enable use of the game without a valid license. Please purchase Minecraft at [minecraft.net](https://www.minecraft.net).
 
 ## Running
 
@@ -39,18 +36,3 @@ The server and client expect the JAR file to be in their running directory.
 cd BetaSharp.(Launcher/Client/Server)
 dotnet build
 ```
-
-## Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for the code of conduct and pull request process. \
-This is a personal project, so review and merge timelines aren't guaranteed, but submissions are appreciated.
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=betasharp-official%2Fbetasharp&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=betasharp-official/betasharp&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=betasharp-official/betasharp&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=betasharp-official/betasharp&type=date&legend=top-left" />
- </picture>
-</a>
