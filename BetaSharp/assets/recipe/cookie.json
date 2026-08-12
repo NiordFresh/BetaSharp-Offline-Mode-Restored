@@ -1,0 +1,14 @@
+{
+    "type": "shaped",
+    "pattern": [
+        "#X#"
+    ],
+    "key": {
+        "X": "betasharp:dye_powder:3",
+        "#": "betasharp:wheat"
+    },
+    "result": {
+        "id": "betasharp:cookie",
+        "count": 8
+    }
+}

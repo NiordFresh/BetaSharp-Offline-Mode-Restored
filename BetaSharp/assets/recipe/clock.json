@@ -1,0 +1,15 @@
+{
+    "type": "shaped",
+    "pattern": [
+        " # ",
+        "#X#",
+        " # "
+    ],
+    "key": {
+        "#": "betasharp:ingot_gold",
+        "X": "betasharp:redstone"
+    },
+    "result": {
+        "id": "betasharp:clock"
+    }
+}

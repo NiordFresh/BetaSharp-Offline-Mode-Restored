@@ -1,0 +1,10 @@
+{
+    "type": "shapeless",
+    "ingredients": [
+        "betasharp:Rose"
+    ],
+    "result": {
+        "id": "betasharp:dye_powder:1",
+        "count": 2
+    }
+}

@@ -1,0 +1,10 @@
+{
+    "type": "shapeless",
+    "ingredients": [
+        "betasharp:Dandelion"
+    ],
+    "result": {
+        "id": "betasharp:dye_powder:11",
+        "count": 2
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "type": "shaped",
+    "pattern": [
+        "##",
+        "##"
+    ],
+    "key": {
+        "#": "betasharp:snowball"
+    },
+    "result": {
+        "id": "betasharp:SnowBlock"
+    }
+}

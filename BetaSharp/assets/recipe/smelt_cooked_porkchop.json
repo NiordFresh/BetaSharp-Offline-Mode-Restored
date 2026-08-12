@@ -1,0 +1,7 @@
+{
+    "type": "smelting",
+    "input": "betasharp:porkchop_raw",
+    "result": {
+        "id": "betasharp:porkchop_cooked"
+    }
+}

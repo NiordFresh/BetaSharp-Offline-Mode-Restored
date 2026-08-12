@@ -1,0 +1,17 @@
+{
+    "type": "shaped",
+    "pattern": [
+        "X X",
+        "X#X",
+        "XRX"
+    ],
+    "key": {
+        "X": "betasharp:ingot_gold",
+        "#": "betasharp:stick",
+        "R": "betasharp:redstone"
+    },
+    "result": {
+        "id": "betasharp:PoweredRail",
+        "count": 6
+    }
+}

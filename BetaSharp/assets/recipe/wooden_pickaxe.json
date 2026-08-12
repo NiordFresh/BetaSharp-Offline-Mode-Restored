@@ -1,0 +1,15 @@
+{
+    "type": "shaped",
+    "pattern": [
+        "XXX",
+        " # ",
+        " # "
+    ],
+    "key": {
+        "X": "betasharp:Planks",
+        "#": "betasharp:stick"
+    },
+    "result": {
+        "id": "betasharp:pickaxe_wood"
+    }
+}

@@ -1,0 +1,17 @@
+{
+    "type": "shaped",
+    "pattern": [
+        "TTT",
+        "#X#",
+        "#R#"
+    ],
+    "key": {
+        "#": "betasharp:Cobblestone",
+        "X": "betasharp:ingot_iron",
+        "R": "betasharp:redstone",
+        "T": "betasharp:Planks"
+    },
+    "result": {
+        "id": "betasharp:Piston"
+    }
+}

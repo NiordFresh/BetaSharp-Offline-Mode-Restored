@@ -1,0 +1,15 @@
+{
+    "type": "shaped",
+    "pattern": [
+        "###",
+        "#X#",
+        "###"
+    ],
+    "key": {
+        "#": "betasharp:paper",
+        "X": "betasharp:compass"
+    },
+    "result": {
+        "id": "betasharp:map"
+    }
+}

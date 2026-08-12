@@ -1,0 +1,15 @@
+{
+    "type": "shaped",
+    "pattern": [
+        "  #",
+        " #X",
+        "# X"
+    ],
+    "key": {
+        "#": "betasharp:stick",
+        "X": "betasharp:string"
+    },
+    "result": {
+        "id": "betasharp:fishing_rod"
+    }
+}

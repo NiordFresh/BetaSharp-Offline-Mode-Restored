@@ -1,0 +1,20 @@
+{
+    "BlockReach": 6,
+    "BreakSpeed": 0,
+    "EntityReach": 4,
+    "BlockDrops": false,
+    "CanBeTargeted": false,
+    "CanBreak": true,
+    "CanDrop": true,
+    "CanExhaustFire": true,
+    "CanInflictDamage": true,
+    "CanInteract": true,
+    "CanPickup": true,
+    "CanPlace": true,
+    "CanReceiveDamage": false,
+    "CanWalk": true,
+    "DisallowFlying": false,
+    "FiniteResources": false,
+    "NeedsAir": false,
+    "VisibleToWorld": true
+}

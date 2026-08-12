@@ -1,0 +1,16 @@
+{
+    "type": "shaped",
+    "pattern": [
+        "###",
+        "#X#",
+        "#R#"
+    ],
+    "key": {
+        "#": "betasharp:Cobblestone",
+        "X": "betasharp:bow",
+        "R": "betasharp:redstone"
+    },
+    "result": {
+        "id": "betasharp:Dispenser"
+    }
+}

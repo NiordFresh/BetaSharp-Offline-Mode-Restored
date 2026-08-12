@@ -1,0 +1,150 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <PublishAot>true</PublishAot>
+    <RuntimeIdentifier Condition="'$(NETCoreSdkRuntimeIdentifier)' == 'linux-x64'">linux-x64</RuntimeIdentifier>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+    <OptimizationPreference>speed</OptimizationPreference>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <ApplicationIcon>logo.ico</ApplicationIcon>
+    <Company>BetaSharp</Company>
+    <Product>BetaSharp Launcher</Product>
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BetaSharp.Client\BetaSharp.Client.csproj" ReferenceOutputAssembly="false" Private="false"/>
+    <ProjectReference Include="..\BetaSharp.Server\BetaSharp.Server.csproj" ReferenceOutputAssembly="false" Private="false"/>
+  </ItemGroup>
+
+  <Target Name="_CopyClientOutput">
+    <PropertyGroup>
+      <ClientRuntimeDir Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)\</ClientRuntimeDir>
+      <ClientOutputDir>..\BetaSharp.Client\bin\$(Configuration)\$(TargetFramework)\$(ClientRuntimeDir)</ClientOutputDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ClientFiles Include="$(ClientOutputDir)**\*.*"/>
+    </ItemGroup>
+
+    <Copy SourceFiles="@(ClientFiles)" DestinationFiles="@(ClientFiles->'$(ClientCopyDestination)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true"/>
+  </Target>
+
+  <Target Name="_CopyServerOutput">
+    <PropertyGroup>
+      <ServerRuntimeDir Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)\</ServerRuntimeDir>
+      <ServerOutputDir>..\BetaSharp.Server\bin\$(Configuration)\$(TargetFramework)\$(ServerRuntimeDir)</ServerOutputDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ServerFiles Include="$(ServerOutputDir)**\*.*"/>
+    </ItemGroup>
+
+    <Copy SourceFiles="@(ServerFiles)" DestinationFiles="@(ServerFiles->'$(ServerCopyDestination)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true"/>
+  </Target>
+
+  <Target Name="CopyClientOutputBuild" AfterTargets="Build">
+    <MSBuild Projects="$(MSBuildProjectFile)" Targets="_CopyClientOutput" Properties="ClientCopyDestination=$(OutputPath)Client\"/>
+  </Target>
+
+  <Target Name="CopyServerOutputBuild" AfterTargets="Build">
+    <MSBuild Projects="$(MSBuildProjectFile)" Targets="_CopyServerOutput" Properties="ServerCopyDestination=$(OutputPath)Server\"/>
+  </Target>
+
+  <Target Name="CopyClientOutputPublish" AfterTargets="Publish">
+    <MSBuild Projects="$(MSBuildProjectFile)" Targets="_CopyClientOutput" Properties="ClientCopyDestination=$(PublishDir)Client\"/>
+  </Target>
+
+  <Target Name="CopyServerOutputPublish" AfterTargets="Publish">
+    <MSBuild Projects="$(MSBuildProjectFile)" Targets="_CopyServerOutput" Properties="ServerCopyDestination=$(PublishDir)Server\"/>
+  </Target>
+
+  <!--
+    The bundled Client/Server assets are copied verbatim from their build output, which
+    ships the pretty-printed source JSON. This shrinks the deployed copies by rewriting
+    each one in-place as compact JSON after it lands in the publish folder.
+  -->
+  <UsingTask TaskName="MinifyJsonFiles" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <AssetsDir ParameterType="System.String" Required="true"/>
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO"/>
+      <Using Namespace="System.Text"/>
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+foreach (var file in Directory.EnumerateFiles(AssetsDir, "*.json", SearchOption.AllDirectories))
+{
+    var text = File.ReadAllText(file);
+    var sb = new StringBuilder(text.Length);
+    var inString = false;
+    var escaped = false;
+    foreach (var c in text)
+    {
+        if (inString)
+        {
+            sb.Append(c);
+            if (escaped) { escaped = false; }
+            else if (c == '\\') { escaped = true; }
+            else if (c == '"') { inString = false; }
+            continue;
+        }
+        if (c == '"') { inString = true; sb.Append(c); continue; }
+        if (char.IsWhiteSpace(c)) { continue; }
+        sb.Append(c);
+    }
+    File.WriteAllText(file, sb.ToString());
+}
+]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="MinifyDeployedJsonAssets" AfterTargets="CopyClientOutputPublish;CopyServerOutputPublish">
+    <MinifyJsonFiles AssetsDir="$(PublishDir)Client/assets" Condition="Exists('$(PublishDir)Client/assets')"/>
+    <MinifyJsonFiles AssetsDir="$(PublishDir)Server/assets" Condition="Exists('$(PublishDir)Server/assets')"/>
+  </Target>
+
+  <ItemGroup>
+    <AvaloniaResource Include="logo.png"/>
+    <AvaloniaResource Include="logo.ico"/>
+    <AvaloniaResource Include="Features\Authentication\background.jpg"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AsyncImageLoader.Avalonia" Version="3.8.0"/>
+
+    <PackageReference Include="Avalonia" Version="12.0.3"/>
+    <PackageReference Include="Avalonia.Desktop" Version="12.0.3"/>
+    <PackageReference Include="Avalonia.Labs.Qr" Version="12.0.2"/>
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.3"/>
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.3"/>
+
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.15">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+
+    <PackageReference Include="CommunityToolkit.Labs.Extensions.DependencyInjection" Version="0.1.251217-build.2433"/>
+
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0"/>
+
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2"/>
+
+    <PackageReference Include="Serilog" Version="4.3.1"/>
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0"/>
+
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8"/>
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8"/>
+
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.84.0"/>
+    <PackageReference Include="Microsoft.Identity.Client.Broker" Version="4.84.0"/>
+    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.84.0"/>
+  </ItemGroup>
+</Project>

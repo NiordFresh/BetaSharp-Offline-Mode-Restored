@@ -1,0 +1,39 @@
+﻿name: Bug report
+description: File a bug report for BetaSharp
+title: "Bug: "
+labels: [ "bug" ]
+body:
+    -   type: markdown
+        attributes:
+            value: |
+                Thanks for taking the time to report a bug!
+    -   type: input
+        id: version
+        attributes:
+          label: Game Version
+          description: Version of Betasharp where the issue was encountered. (release tag or hash)
+          placeholder: ex. snapshot-pre1.0_5
+        validations:
+          required: true
+    -   type: textarea
+        id: description
+        attributes:
+            label: Describe the bug
+            description: A clear and concise description of what the bug is.
+        validations:
+            required: true
+    -   type: textarea
+        id: steps
+        attributes:
+            label: Steps to Reproduce
+            placeholder: |
+                1. Go to '...'
+                2. Do '...'
+                3. See error
+        validations:
+            required: true
+    -   type: textarea
+        id: logs
+        attributes:
+            label: Relevant log output
+            render: shell

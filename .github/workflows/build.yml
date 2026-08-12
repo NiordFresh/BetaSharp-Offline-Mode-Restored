@@ -1,0 +1,30 @@
+﻿name: .NET
+
+on:
+    push:
+        branches: [ "dev" ]
+    pull_request:
+        branches: [ "dev" ]
+
+jobs:
+    build:
+        runs-on: docker
+        env:
+            DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup .NET
+              uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: 10.0.x
+
+            - name: Restore dependencies
+              run: dotnet restore
+
+            - name: Build
+              run: dotnet build --configuration Release --no-restore
+
+            - name: Test
+              run: dotnet test --configuration Release --no-build --verbosity normal

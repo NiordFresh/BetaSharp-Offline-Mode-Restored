@@ -1,0 +1,77 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:BetaSharp.Launcher.Features.Home"
+             xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
+
+             x:Class="BetaSharp.Launcher.Features.Home.HomeView" x:DataType="local:HomeViewModel">
+
+    <Border Padding="25">
+    <Grid RowDefinitions="Auto * Auto" RowSpacing="50" IsVisible="{CompiledBinding Session, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <Grid ColumnDefinitions="* 0.35*" Grid.Row="0">
+            <StackPanel Spacing="25" HorizontalAlignment="Stretch" Orientation="Horizontal" Grid.Row="0">
+                <Border Width="50" Height="50" ClipToBounds="True" CornerRadius="{StaticResource ControlCornerRadius}">
+                    <asyncImageLoader:AdvancedImage Source="{Binding Session.Face, FallbackValue='...'}" Stretch="UniformToFill"
+                                                    RenderOptions.BitmapInterpolationMode="None">
+
+                        <asyncImageLoader:AdvancedImage.Styles>
+                            <Style Selector="asyncImageLoader|AdvancedImage">
+                                <Setter Property="Transitions">
+                                    <Transitions>
+                                        <DoubleTransition Property="Opacity" Duration="0:0:0.5" />
+                                    </Transitions>
+                                </Setter>
+                            </Style>
+
+                            <Style Selector="asyncImageLoader|AdvancedImage[IsLoading=True]">
+                                <Setter Property="Opacity" Value="0" />
+                            </Style>
+
+                            <Style Selector="asyncImageLoader|AdvancedImage[IsLoading=False]">
+                                <Setter Property="Opacity" Value="1" />
+                            </Style>
+                        </asyncImageLoader:AdvancedImage.Styles>
+                    </asyncImageLoader:AdvancedImage>
+                </Border>
+
+                <StackPanel Spacing="0" VerticalAlignment="Center">
+                    <TextBlock Text="Welcome" Opacity="0.5" />
+                    <TextBlock Text="{CompiledBinding Session.Name, FallbackValue='...'}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </StackPanel>
+            </StackPanel>
+
+            <Button Content="Sign out" VerticalAlignment="Center" Command="{CompiledBinding SignOutCommand}" Grid.Column="1" />
+        </Grid>
+
+        <Grid VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Row="1">
+            <TextBlock Text="This looks rather empty..." Opacity="0.5" Classes.hidden="{CompiledBinding Releases.Count}" />
+
+            <Grid RowDefinitions="Auto *" RowSpacing="10" Classes="hidden" Classes.shown="{CompiledBinding Releases.Count}">
+                <TextBlock Text="Releases" Margin="8 0 0 0" Grid.Row="0" />
+
+                <ScrollViewer CornerRadius="{StaticResource ControlCornerRadius}" Grid.Row="1">
+                    <ItemsControl ItemsSource="{CompiledBinding Releases}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="* *">
+                                    <HyperlinkButton NavigateUri="{CompiledBinding Url}" Grid.Column="0">
+                                        <TextBlock Text="{CompiledBinding Name}" TextTrimming="CharacterEllipsis"  />
+                                    </HyperlinkButton>
+
+                                    <TextBlock Text="{CompiledBinding Date}" HorizontalAlignment="Right" VerticalAlignment="Center" Opacity="0.5" Grid.Column="1" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+
+        <Grid ColumnDefinitions="* 0.35*" ColumnSpacing="10" Grid.Row="2">
+            <!-- ReSharper disable once Xaml.StyleClassNotFound -->
+            <Button Content="Play" Classes="accent" Command="{CompiledBinding PlayCommand}" Grid.Column="0" />
+
+            <Button Content="Host" Command="{CompiledBinding HostCommand}" Grid.Column="1" />
+        </Grid>
+    </Grid>
+    </Border>
+</UserControl>

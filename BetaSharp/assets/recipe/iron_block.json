@@ -1,0 +1,14 @@
+{
+    "type": "shaped",
+    "pattern": [
+        "###",
+        "###",
+        "###"
+    ],
+    "key": {
+        "#": "betasharp:ingot_iron"
+    },
+    "result": {
+        "id": "betasharp:IronBlock"
+    }
+}

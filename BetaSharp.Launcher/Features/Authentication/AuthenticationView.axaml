@@ -1,0 +1,50 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:BetaSharp.Launcher.Features.Authentication"
+
+             x:Class="BetaSharp.Launcher.Features.Authentication.AuthenticationView" x:DataType="local:AuthenticationViewModel">
+
+    <UserControl.Styles>
+        <Style Selector=":is(TextBlock)">
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <Image Source="avares://BetaSharp.Launcher/Features/Authentication/background.jpg" Stretch="UniformToFill" />
+
+        <Grid RowDefinitions="*,Auto">
+            <!-- Center: code flow message -->
+            <Grid VerticalAlignment="Center" Grid.Row="0" Margin="0,120,0,0">
+                <Grid Classes.hidden="{CompiledBinding IsReady}">
+                    <StackPanel />
+                </Grid>
+
+                <Grid Classes="hidden" Classes.shown="{CompiledBinding IsReady}">
+                    <Border Background="#80000000" CornerRadius="8" Padding="20" Margin="20,0" HorizontalAlignment="Center">
+                        <SelectableTextBlock Text="{CompiledBinding Message}" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="350" />
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- Bottom: buttons -->
+            <StackPanel Grid.Row="1" Spacing="10" Margin="20,0,20,20">
+                <!-- Offline Mode -->
+                <Border Background="#40000000" CornerRadius="8" Padding="12">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Offline Mode" FontSize="12" FontWeight="Bold" Opacity="0.7" />
+                        <TextBox PlaceholderText="Enter username" Text="{CompiledBinding OfflineUsername}" FontSize="14" />
+                        <Button Content="Play Offline" Foreground="White" Command="{CompiledBinding UseOfflineCommand}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Microsoft -->
+                <!-- ReSharper disable once Xaml.StyleClassNotFound -->
+                <Button Content="Authenticate with Microsoft" Classes="accent" Command="{CompiledBinding UseWebCommand}" FontSize="14" />
+
+                <!-- Having issues -->
+                <Button Content="Having issues?" Command="{CompiledBinding UseCodeCommand}" Background="Transparent" Foreground="White" BorderThickness="0" FontSize="12" />
+            </StackPanel>
+        </Grid>
+    </Panel>
+</UserControl>

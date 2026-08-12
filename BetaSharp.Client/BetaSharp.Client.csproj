@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <RuntimeIdentifier Condition="'$(NETCoreSdkRuntimeIdentifier)' == 'linux-x64'">linux-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BetaSharp\BetaSharp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="BetaSharp.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="SixLabors.Fonts" Version="2.1.3" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="BannedSymbols.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="assets\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\BetaSharp\assets\**\*">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <Link>assets\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
+  <!--
+    ImGuiImplGLFW.so has RUNPATH $ORIGIN and a NEEDED entry for "libglfw.so", but the
+    bundled GLFW from ultz.native.glfw is named "libglfw.so.3". The OS dynamic linker
+    looks for the exact filename "libglfw.so" in the same directory, so it fails unless
+    we provide a copy under that name. This target runs after every build and creates
+    "libglfw.so" copies in each Linux native output directory that contains "libglfw.so.3".
+  -->
+  <Target Name="CreateGlfwCompatCopy" AfterTargets="Build">
+    <ItemGroup>
+      <_GlfwSo3Files Include="$(OutDir)runtimes\linux-*\native\libglfw.so.3" />
+      <_GlfwSo3Files Include="$(OutDir)libglfw.so.3" Condition="Exists('$(OutDir)libglfw.so.3')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_GlfwSo3Files)" DestinationFiles="@(_GlfwSo3Files->'%(RootDir)%(Directory)libglfw.so')" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

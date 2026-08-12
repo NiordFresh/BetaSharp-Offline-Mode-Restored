@@ -1,0 +1,604 @@
+using System.Runtime.InteropServices;
+using BetaSharp.Client.Options;
+using BetaSharp.Client.Rendering.Core;
+using BetaSharp.Client.Rendering.Core.Textures;
+using BetaSharp.Client.Rendering.UI;
+using Microsoft.Extensions.Logging;
+using Silk.NET.OpenGL;
+using SixLabors.Fonts;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Drawing.Processing;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+
+namespace BetaSharp.Client.Rendering;
+
+public class TextRenderer : IDisposable
+{
+    private readonly ILogger<TextRenderer> _logger = Log.Instance.For<TextRenderer>();
+
+    private const char ColorCodeChar = '§';
+
+    private const string MonocraftFontPath = "assets/font/Monocraft.ttc";
+    private const string UnifontPath = "assets/font/unifont.ttf";
+
+    private const int AtlasSize = 2048;
+    private const int AtlasFontSize = 64;
+    private const int GlyphPadding = 2;
+    private const float DisplayScale = 0.125f;
+
+    private FontFamily _monoFamily;
+    private FontFamily _uniFamily;
+    private Font _font;
+    private TextOptions _textOptions;
+    private readonly Image<Rgba32> _atlasImage;
+    private readonly Dictionary<char, GlyphInfo> _glyphCache = [];
+    private int _atlasX;
+    private int _atlasY;
+    private readonly int _rowHeight;
+
+    private TextureHandle? fontTextureName { get; }
+    internal uint FontTextureId => fontTextureName != null ? (uint)fontTextureName.Id : 0;
+
+    private readonly TextureManager _textureManager;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly struct GlyphInfo(float advanceWidth, float u0, float v0, float u1, float v1, float width, float height)
+    {
+        public readonly float AdvanceWidth = advanceWidth;
+        public readonly float U0 = u0, V0 = v0, U1 = u1, V1 = v1;
+        public readonly float Width = width, Height = height;
+    }
+
+    private void LoadClassicFontIntoAtlas(Image<Rgba32> classicFontImage)
+    {
+        int scale = AtlasFontSize / 8;
+        int imgWidth = classicFontImage.Width;
+        int imgHeight = classicFontImage.Height;
+
+        Rgba32[] pixels = new Rgba32[imgWidth * imgHeight];
+        classicFontImage.CopyPixelDataTo(pixels);
+
+        for (int charIndex = 32; charIndex < 127; ++charIndex)
+        {
+            int col = charIndex % 16;
+            int row = charIndex / 16;
+            int lastSolidPixel = -1;
+
+            for (int bit = 7; bit >= 0; --bit)
+            {
+                int xOffset = col * 8 + bit;
+                bool columnIsEmpty = true;
+
+                for (int yOffset = 0; yOffset < 8 && columnIsEmpty; ++yOffset)
+                {
+                    int pixelIndex = (row * 8 + yOffset) * imgWidth + xOffset;
+                    if (pixels[pixelIndex].A > 0)
+                    {
+                        columnIsEmpty = false;
+                    }
+                }
+
+                if (!columnIsEmpty)
+                {
+                    lastSolidPixel = bit;
+                    break;
+                }
+            }
+
+            int advancePixels = lastSolidPixel + 2;
+            if (charIndex == 32) advancePixels = 4;
+
+            int cellW = 8 * scale;
+            int cellH = 8 * scale;
+
+            if (_atlasX + cellW > AtlasSize)
+            {
+                _atlasX = 0;
+                _atlasY += _rowHeight;
+            }
+
+            using (Image<Rgba32> glyphImage = classicFontImage.Clone(ctx => ctx
+                .Crop(new Rectangle(col * 8, row * 8, 8, 8))
+                .Resize(cellW, cellH, KnownResamplers.NearestNeighbor)))
+            {
+                glyphImage.ProcessPixelRows(_atlasImage, (srcAccessor, dstAccessor) =>
+                {
+                    for (int y = 0; y < cellH; y++)
+                    {
+                        Span<Rgba32> srcRow = srcAccessor.GetRowSpan(y);
+                        Span<Rgba32> dstRow = dstAccessor.GetRowSpan(_atlasY + y);
+                        srcRow.Slice(0, cellW).CopyTo(dstRow.Slice(_atlasX, cellW));
+                    }
+                });
+            }
+
+            float u0 = (float)_atlasX / AtlasSize;
+            float v0 = (float)_atlasY / AtlasSize;
+            float u1 = (float)(_atlasX + cellW) / AtlasSize;
+            float v1 = (float)(_atlasY + cellH) / AtlasSize;
+
+            char c = (char)charIndex;
+
+            float advanceWidth = advancePixels * scale;
+            _glyphCache[c] = new GlyphInfo(advanceWidth, u0, v0, u1, v1, cellW, cellH);
+
+            _atlasX += cellW;
+        }
+
+        UploadAtlasSubImage(0, 0, AtlasSize, _atlasY + _rowHeight);
+    }
+
+    public TextRenderer(GameOptions options, TextureManager textureManager)
+    {
+        _textureManager = textureManager;
+
+        string monoPath = Path.Combine(AppContext.BaseDirectory, "font", "Monocraft.ttc");
+        string uniPath = Path.Combine(AppContext.BaseDirectory, "font", "unifont.ttf");
+
+        if (!File.Exists(monoPath))
+            monoPath = MonocraftFontPath;
+
+        if (!File.Exists(uniPath))
+            uniPath = UnifontPath;
+
+        if (!File.Exists(monoPath))
+            throw new FileNotFoundException("Monocraft font not found", monoPath);
+
+        if (!File.Exists(uniPath))
+            throw new FileNotFoundException("Unifont font not found", uniPath);
+
+        var collection = new FontCollection();
+        _monoFamily = collection.AddCollection(monoPath).First();
+        _uniFamily = collection.Add(uniPath);
+
+        _rowHeight = AtlasFontSize + GlyphPadding;
+        _atlasImage = new Image<Rgba32>(AtlasSize, AtlasSize);
+
+        fontTextureName = textureManager.Load(_atlasImage);
+        fontTextureName.Texture?.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+
+        _font = _monoFamily.CreateFont(AtlasFontSize);
+        _textOptions = new TextOptions(_font);
+
+        ApplyFontForLanguage();
+
+        Translations.LanguageChanged += ReloadForLanguage;
+    }
+
+    private bool UseUnifontPrimary =>
+        Translations.Instance.CurrentLanguage.Unifont;
+
+    private void ApplyFontForLanguage()
+    {
+        ClearAtlasRegion(0, 0, AtlasSize, AtlasSize);
+        _atlasX = 0;
+        _atlasY = 0;
+        _glyphCache.Clear();
+
+        if (UseUnifontPrimary)
+        {
+            _font = _uniFamily.CreateFont(AtlasFontSize);
+            _textOptions = new TextOptions(_font);
+        }
+        else
+        {
+            _font = _monoFamily.CreateFont(AtlasFontSize);
+            _textOptions = new TextOptions(_font)
+            {
+                FallbackFontFamilies = [_uniFamily]
+            };
+
+            try
+            {
+                AssetManager.Asset asset = AssetManager.Instance.getAsset("font/default.png");
+                using var stream = new MemoryStream(asset.GetBinaryContent());
+                using var classicFontImage = Image.Load<Rgba32>(stream);
+                LoadClassicFontIntoAtlas(classicFontImage);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load classic font. Falling back entirely to TrueType.");
+            }
+        }
+    }
+
+    public void ReloadForLanguage()
+    {
+        ApplyFontForLanguage();
+    }
+
+    public void Dispose()
+    {
+        Translations.LanguageChanged -= ReloadForLanguage;
+    }
+
+    private static void ClearAtlasRegion(Image<Rgba32> image, int x, int y, int w, int h)
+    {
+        image.Mutate(ctx => ctx.Fill(SixLabors.ImageSharp.Color.Transparent, new Rectangle(x, y, w, h)));
+    }
+
+    private void ClearAtlasRegion(int x, int y, int w, int h)
+    {
+        ClearAtlasRegion(_atlasImage, x, y, w, h);
+    }
+
+    private GlyphInfo GetOrCreateGlyph(char c)
+    {
+        if (_glyphCache.TryGetValue(c, out GlyphInfo info))
+            return info;
+
+        if (char.IsControl(c))
+            c = '?';
+
+        char[] charArray = [c];
+        ReadOnlySpan<char> charSpan = charArray;
+
+        FontRectangle advanceRect;
+
+        try
+        {
+            advanceRect = TextMeasurer.MeasureAdvance(charSpan, _textOptions);
+        }
+        catch
+        {
+            c = '?';
+            charSpan = "?";
+            advanceRect = TextMeasurer.MeasureAdvance(charSpan, _textOptions);
+        }
+
+        float advanceWidth = advanceRect.Width;
+        int cellW = Math.Max(1, (int)Math.Ceiling(advanceRect.Width) + GlyphPadding);
+        int cellH = _rowHeight;
+
+        if (_atlasX + cellW > AtlasSize)
+        {
+            _atlasX = 0;
+            _atlasY += _rowHeight;
+        }
+
+        if (_atlasY + cellH > AtlasSize)
+        {
+            _glyphCache.Clear();
+            ClearAtlasRegion(0, 0, AtlasSize, AtlasSize);
+            _atlasX = 0;
+            _atlasY = 0;
+
+            if (!UseUnifontPrimary)
+            {
+                AssetManager.Asset asset = AssetManager.Instance.getAsset("font/default.png");
+                using var stream = new MemoryStream(asset.GetBinaryContent());
+                using var classicFontImage = Image.Load<Rgba32>(stream);
+                LoadClassicFontIntoAtlas(classicFontImage);
+            }
+        }
+
+        using (Image<Rgba32> glyphImage = new Image<Rgba32>(cellW, cellH))
+        {
+            ClearAtlasRegion(glyphImage, 0, 0, cellW, cellH);
+
+            float drawX = 1f;
+            float drawY = 1f;
+
+            glyphImage.Mutate(ctx =>
+            {
+                RichTextOptions options = new(_font)
+                {
+                    Origin = new PointF(drawX, drawY),
+                    FallbackFontFamilies = _textOptions.FallbackFontFamilies
+                };
+
+                ctx.DrawText(
+                    options,
+                    c.ToString(),
+                    Color.White);
+            });
+
+            glyphImage.ProcessPixelRows(_atlasImage, (srcAccessor, dstAccessor) =>
+            {
+                for (int gy = 0; gy < cellH; gy++)
+                {
+                    Span<Rgba32> srcRow = srcAccessor.GetRowSpan(gy);
+                    Span<Rgba32> dstRow = dstAccessor.GetRowSpan(_atlasY + gy);
+                    srcRow.Slice(0, cellW).CopyTo(dstRow.Slice(_atlasX, cellW));
+                }
+            });
+        }
+
+        float u0 = (float)_atlasX / AtlasSize;
+        float v0 = (float)_atlasY / AtlasSize;
+        float u1 = (float)(_atlasX + cellW) / AtlasSize;
+        float v1 = (float)(_atlasY + cellH) / AtlasSize;
+
+        UploadAtlasSubImage(_atlasX, _atlasY, cellW, cellH);
+
+        info = new GlyphInfo(advanceWidth, u0, v0, u1, v1, cellW, cellH);
+        _glyphCache[c] = info;
+        _atlasX += cellW;
+        return info;
+    }
+
+    private unsafe void UploadAtlasSubImage(int x, int y, int width, int height)
+    {
+        if (fontTextureName?.Texture == null) return;
+
+        int bufferSize = width * height * 4;
+
+        byte[] region = System.Buffers.ArrayPool<byte>.Shared.Rent(bufferSize);
+        try
+        {
+            int idx = 0;
+            _atlasImage.ProcessPixelRows(accessor =>
+            {
+                for (int row = y; row < y + height; row++)
+                {
+                    Span<Rgba32> pixelRow = accessor.GetRowSpan(row);
+                    for (int col = x; col < x + width; col++)
+                    {
+                        Rgba32 p = pixelRow[col];
+                        region[idx++] = p.R;
+                        region[idx++] = p.G;
+                        region[idx++] = p.B;
+                        region[idx++] = p.A;
+                    }
+                }
+            });
+
+            fixed (byte* ptr = region)
+            {
+                fontTextureName.Texture!.UploadSubImage(x, y, width, height, ptr);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading atlas sub image");
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(region);
+        }
+    }
+
+    public void DrawStringWithShadow(ReadOnlySpan<char> text, float x, float y, Guis.Color color, HorizontalAlignment align = HorizontalAlignment.Left, UIBatchRenderer? batch = null, float scale = 1f, float cos = 1f, float sin = 0f, float pivotX = 0f, float pivotY = 0f)
+    {
+        RenderString(text, x + 1, y + 1, color, true, align, batch, scale, cos, sin, pivotX, pivotY);
+        DrawString(text, x, y, color, align, batch, scale, cos, sin, pivotX, pivotY);
+    }
+
+    public void DrawString(ReadOnlySpan<char> text, float x, float y, Guis.Color color, HorizontalAlignment align = HorizontalAlignment.Left, UIBatchRenderer? batch = null, float scale = 1f, float cos = 1f, float sin = 0f, float pivotX = 0f, float pivotY = 0f)
+    {
+        RenderString(text, x, y, color, false, align, batch, scale, cos, sin, pivotX, pivotY);
+    }
+
+    public void RenderString(ReadOnlySpan<char> text, float x, float y, Guis.Color color, bool darken, HorizontalAlignment align, UIBatchRenderer? batch = null, float scale = 1f, float cos = 1f, float sin = 0f, float pivotX = 0f, float pivotY = 0f)
+    {
+        if (text.IsEmpty) return;
+
+        if (darken)
+            color = color.Darken();
+
+        float currentX = x;
+        float currentY = y;
+
+        int width = GetStringWidth(text);
+        if (align == HorizontalAlignment.Center) currentX -= width * scale / 2f;
+        else if (align == HorizontalAlignment.Right) currentX -= width * scale;
+
+        if (batch != null)
+        {
+            batch.SetTexture((uint)fontTextureName!.Id);
+            uint currentRgba = (uint)color;
+            bool isRotated = sin != 0f;
+
+            for (int i = 0; i < text.Length; ++i)
+            {
+                for (; text.Length > i + 1 && text[i] == ColorCodeChar; i += 2)
+                {
+                    if (TryHexToDec(text[i + 1], out int colorCode))
+                        currentRgba = (uint)Guis.Color.FromColorCode(colorCode, (byte)color.A, darken);
+                }
+
+                if (i < text.Length)
+                {
+                    GlyphInfo glyph = GetOrCreateGlyph(text[i]);
+                    if (glyph.Width > 0 && glyph.Height > 0)
+                    {
+                        float w = glyph.Width * DisplayScale * scale;
+                        float h = glyph.Height * DisplayScale * scale;
+
+                        if (!isRotated)
+                        {
+                            batch.AddQuad(currentX, currentY, currentX + w, currentY + h, glyph.U0, glyph.V0, glyph.U1, glyph.V1, currentRgba);
+                        }
+                        else
+                        {
+                            float lx0 = currentX, ly0 = currentY;
+                            float lx1 = currentX, ly1 = currentY + h;
+                            float lx2 = currentX + w, ly2 = currentY + h;
+                            float lx3 = currentX + w, ly3 = currentY;
+                            batch.AddQuadCorners(
+                                pivotX + lx0 * cos - ly0 * sin, pivotY + lx0 * sin + ly0 * cos,
+                                pivotX + lx1 * cos - ly1 * sin, pivotY + lx1 * sin + ly1 * cos,
+                                pivotX + lx2 * cos - ly2 * sin, pivotY + lx2 * sin + ly2 * cos,
+                                pivotX + lx3 * cos - ly3 * sin, pivotY + lx3 * sin + ly3 * cos,
+                                glyph.U0, glyph.V0, glyph.U1, glyph.V1, currentRgba);
+                        }
+                    }
+
+                    float advance = glyph.AdvanceWidth * DisplayScale * scale;
+                    currentX = isRotated ? currentX + advance : MathF.Floor(currentX + advance);
+                }
+            }
+            return;
+        }
+
+        fontTextureName?.Bind();
+
+        Tessellator tessellator = Tessellator.instance;
+        tessellator.startDrawingQuads();
+        tessellator.setColorRGBA(color);
+
+        for (int i = 0; i < text.Length; ++i)
+        {
+            for (; text.Length > i + 1 && text[i] == ColorCodeChar; i += 2)
+            {
+                if (TryHexToDec(text[i + 1], out int colorCode))
+                {
+                    tessellator.setColorRGBA(Guis.Color.FromColorCode(colorCode, (byte)color.A, darken));
+                }
+            }
+
+            if (i < text.Length)
+            {
+                GlyphInfo glyph = GetOrCreateGlyph(text[i]);
+                if (glyph.Width > 0 && glyph.Height > 0)
+                {
+                    float w = glyph.Width * DisplayScale;
+                    float h = glyph.Height * DisplayScale;
+                    tessellator.addVertexWithUV(currentX + 0, currentY + h, 0, glyph.U0, glyph.V1);
+                    tessellator.addVertexWithUV(currentX + w, currentY + h, 0, glyph.U1, glyph.V1);
+                    tessellator.addVertexWithUV(currentX + w, currentY + 0, 0, glyph.U1, glyph.V0);
+                    tessellator.addVertexWithUV(currentX + 0, currentY + 0, 0, glyph.U0, glyph.V0);
+                }
+
+                currentX = MathF.Floor(currentX + glyph.AdvanceWidth * DisplayScale);
+            }
+        }
+
+        tessellator.draw();
+    }
+
+    private static int HexToDec(char c)
+    {
+        int v = c;
+        if (c <= '9') v -= '0';
+        else if (c <= 'F') v += 10 - 'A';
+        else if (c <= 'f') v += 10 - 'a';
+        else return 15;
+        return v <= 0 ? 0 : v;
+    }
+
+    private static bool TryHexToDec(char c, out int result)
+    {
+        int v = c;
+        if (c <= '9') v -= '0';
+        else if (c <= 'F') v += 10 - 'A';
+        else if (c <= 'f') v += 10 - 'a';
+        else
+        {
+            result = 15;
+            return false;
+        }
+
+        if (v <= 0)
+        {
+            result = 0;
+            return false;
+        }
+        result = v;
+        return true;
+    }
+
+    public int GetStringWidth(ReadOnlySpan<char> text)
+    {
+        if (text.IsEmpty) return 0;
+        float total = 0;
+        for (int i = 0; i < text.Length; ++i)
+        {
+            if (text[i] == ColorCodeChar)
+                ++i;
+            else
+                total += GetOrCreateGlyph(text[i]).AdvanceWidth * DisplayScale;
+        }
+
+        return (int)Math.Ceiling(total);
+    }
+
+    private int GetStringFitLength(ReadOnlySpan<char> text, int maxWidth)
+    {
+        float width = 0;
+        int lastSpaceIndex = -1;
+        int i = 0;
+        for (; i < text.Length; ++i)
+        {
+            if (text[i] == ColorCodeChar)
+            {
+                ++i;
+                continue;
+            }
+
+            if (text[i] == ' ')
+                lastSpaceIndex = i;
+            width += GetOrCreateGlyph(text[i]).AdvanceWidth * DisplayScale;
+            if (width > maxWidth)
+            {
+                if (lastSpaceIndex > 0)
+                    return lastSpaceIndex;
+                return Math.Max(1, i);
+            }
+        }
+
+        return text.Length;
+    }
+
+    private void ProcessWrappedText(ReadOnlySpan<char> text, int x, int y, int maxWidth, Guis.Color color, bool draw, ref int outHeight, HorizontalAlignment align, UIBatchRenderer? batch = null)
+    {
+        if (text.IsEmpty) return;
+
+        int totalHeight = 0;
+        int currentY = y;
+        int lineHeight = (int)((AtlasFontSize + GlyphPadding) * DisplayScale);
+        while (text.Length > 0)
+        {
+            int newlineIndex = text.IndexOf('\n');
+            ReadOnlySpan<char> line;
+            if (newlineIndex >= 0)
+            {
+                line = text.Slice(0, newlineIndex);
+                text = text.Slice(newlineIndex + 1);
+            }
+            else
+            {
+                line = text;
+                text = [];
+            }
+
+            while (line.Length > 0)
+            {
+                int fitLength = GetStringFitLength(line, maxWidth);
+                ReadOnlySpan<char> subline = line.Slice(0, Math.Min(fitLength, line.Length));
+
+                while (subline.Length > 0 && subline[subline.Length - 1] == ' ')
+                    subline = subline.Slice(0, subline.Length - 1);
+
+                if (subline.Length > 0 || fitLength > 0)
+                {
+                    if (draw && subline.Length > 0)
+                        DrawString(subline, x, currentY, color, align, batch);
+                    currentY += lineHeight;
+                    totalHeight += lineHeight;
+                }
+
+                line = line.Slice(Math.Min(fitLength, line.Length));
+                while (line.Length > 0 && line[0] == ' ')
+                    line = line.Slice(1);
+            }
+        }
+
+        if (totalHeight < lineHeight) totalHeight = lineHeight;
+        outHeight = totalHeight;
+    }
+
+    public void DrawStringWrapped(ReadOnlySpan<char> text, int x, int y, int maxWidth, Guis.Color color, HorizontalAlignment align = HorizontalAlignment.Left, UIBatchRenderer? batch = null)
+    {
+        int dummyHeight = 0;
+        ProcessWrappedText(text, x, y, maxWidth, color, true, ref dummyHeight, align, batch);
+    }
+
+    public int GetStringHeight(ReadOnlySpan<char> text, int maxWidth)
+    {
+        int height = 0;
+        ProcessWrappedText(text, 0, 0, maxWidth, Guis.Color.Black, false, ref height, HorizontalAlignment.Left);
+        return height;
+    }
+}

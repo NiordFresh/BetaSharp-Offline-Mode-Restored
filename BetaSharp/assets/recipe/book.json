@@ -1,0 +1,14 @@
+{
+    "type": "shaped",
+    "pattern": [
+        "#",
+        "#",
+        "#"
+    ],
+    "key": {
+        "#": "betasharp:paper"
+    },
+    "result": {
+        "id": "betasharp:book"
+    }
+}

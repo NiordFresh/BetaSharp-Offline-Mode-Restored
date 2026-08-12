@@ -1,0 +1,13 @@
+{
+    "type": "shaped",
+    "pattern": [
+        "##",
+        "##"
+    ],
+    "key": {
+        "#": "betasharp:clay"
+    },
+    "result": {
+        "id": "betasharp:clay"
+    }
+}
